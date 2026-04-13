@@ -1,1304 +1,570 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Chainage Finder</title>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
-  <style>
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0
-    }
-
-    :root {
-      --bg: #0d0f14;
-      --surface: #151820;
-      --surface2: #1c2030;
-      --border: #2a2f40;
-      --accent: #00e5a0;
-      --text: #e8ecf4;
-      --muted: #6b7490;
-      --warn: #ffb347;
-      --danger: #ff5a5a;
-      --success: #00e5a0;
-      --mono: 'IBM Plex Mono', monospace;
-      --display: 'Syne', sans-serif;
-    }
-
-    body {
-      font-family: var(--display);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: linear-gradient(rgba(0, 229, 160, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 229, 160, 0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0
-    }
-
-    .app {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      min-height: 100vh
-    }
-
-    @media(max-width:860px) {
-      .app {
-        grid-template-columns: 1fr;
-        display: flex;
-        flex-direction: column
-      }
-    }
-
-    /* ── LEFT ── */
-    .left {
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      padding: 1.75rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: .9rem;
-      overflow-y: auto;
-      max-height: 100vh;
-      position: sticky;
-      top: 0
-    }
-
-    @media(max-width:860px) {
-      .left {
-        max-height: none;
-        position: static;
-        overflow-y: visible;
-        border-right: none;
-        border-bottom: 1px solid var(--border)
-      }
-    }
-
-    .logo {
-      font-size: 21px;
-      font-weight: 800;
-      letter-spacing: -.02em
-    }
-
-    .logo span {
-      color: var(--accent)
-    }
-
-    .tagline {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: .1em;
-      margin-top: 2px
-    }
-
-    .card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.1rem
-    }
-
-    .card-label {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .12em;
-      color: var(--accent);
-      text-transform: uppercase;
-      margin-bottom: 7px;
-      display: flex;
-      align-items: center;
-      gap: 6px
-    }
-
-    .step-num {
-      width: 16px;
-      height: 16px;
-      background: var(--accent);
-      color: #000;
-      border-radius: 50%;
-      font-size: 8px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0
-    }
-
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 10px
-    }
-
-    .dropzone {
-      border: 2px dashed var(--border);
-      border-radius: 9px;
-      padding: 1.1rem .9rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all .2s;
-      position: relative;
-      background: var(--bg)
-    }
-
-    .dropzone:hover,
-    .dropzone.drag-over {
-      border-color: var(--accent);
-      background: rgba(0, 229, 160, 0.04)
-    }
-
-    .dropzone input[type=file] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%
-    }
-
-    .drop-icon {
-      font-size: 20px;
-      display: block;
-      margin-bottom: 5px
-    }
-
-    .drop-text {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted)
-    }
-
-    .drop-text strong {
-      color: var(--accent);
-      font-weight: 500
-    }
-
-    .drop-formats {
-      font-family: var(--mono);
-      font-size: 9px;
-      color: #3a4055;
-      margin-top: 3px
-    }
-
-    .loaded-pill {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 9px 11px;
-      border-radius: 8px;
-      font-family: var(--mono);
-      font-size: 11px
-    }
-
-    .loaded-pill.green {
-      background: rgba(0, 229, 160, 0.08);
-      border: 1px solid rgba(0, 229, 160, 0.25);
-      color: var(--accent)
-    }
-
-    .loaded-pill.blue {
-      background: rgba(0, 119, 255, 0.08);
-      border: 1px solid rgba(0, 119, 255, 0.25);
-      color: #60aaff
-    }
-
-    .loaded-pill img {
-      width: 38px;
-      height: 38px;
-      object-fit: cover;
-      border-radius: 5px;
-      flex-shrink: 0
-    }
-
-    .pill-name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight: 500
-    }
-
-    .pill-sub {
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 1px
-    }
-
-    .pill-x {
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 17px;
-      line-height: 1;
-      flex-shrink: 0;
-      padding: 0
-    }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: .6rem 0
-    }
-
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border)
-    }
-
-    .divider span {
-      font-family: var(--mono);
-      font-size: 9px;
-      color: var(--muted);
-      letter-spacing: .1em
-    }
-
-    .coord-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px
-    }
-
-    .field label {
-      display: block;
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .08em;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-bottom: 3px
-    }
-
-    .field input,
-    .field textarea {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 10px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text);
-      outline: none;
-      transition: border-color .2s
-    }
-
-    .field input:focus,
-    .field textarea:focus {
-      border-color: var(--accent)
-    }
-
-    .field input::placeholder,
-    .field textarea::placeholder {
-      color: #2e3448
-    }
-
-    .field textarea {
-      resize: vertical;
-      min-height: 48px
-    }
-
-    .btn-find {
-      width: 100%;
-      padding: 11px;
-      background: var(--accent);
-      color: #000;
-      border: none;
-      border-radius: 9px;
-      font-family: var(--display);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform .15s, box-shadow .2s;
-      box-shadow: 0 0 18px rgba(0, 229, 160, 0.2)
-    }
-
-    .btn-find:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 28px rgba(0, 229, 160, 0.35)
-    }
-
-    .btn-find:active {
-      transform: scale(.98)
-    }
-
-    .result-box {
-      background: linear-gradient(135deg, rgba(0, 229, 160, 0.1), rgba(0, 229, 160, 0.03));
-      border: 1px solid rgba(0, 229, 160, 0.3);
-      border-radius: 11px;
-      padding: 1.1rem;
-      position: relative;
-      overflow: hidden
-    }
-
-    .result-box::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 70px;
-      height: 100%;
-      background: radial-gradient(ellipse at right, rgba(0, 229, 160, 0.1), transparent 70%)
-    }
-
-    .result-tag {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .15em;
-      color: var(--accent);
-      text-transform: uppercase;
-      margin-bottom: 3px
-    }
-
-    .result-chainage {
-      font-size: 1.9rem;
-      font-weight: 800;
-      color: var(--accent);
-      letter-spacing: -.02em;
-      margin-bottom: 3px
-    }
-
-    .result-dist {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted)
-    }
-
-    .result-coords {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: #3a4055;
-      margin-top: 2px
-    }
-
-    .issue-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 7px
-    }
-
-    .btn-add {
-      width: 100%;
-      padding: 10px;
-      background: transparent;
-      color: var(--accent);
-      border: 1.5px solid var(--accent);
-      border-radius: 9px;
-      font-family: var(--display);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background .2s, transform .15s
-    }
-
-    .btn-add:hover {
-      background: rgba(0, 229, 160, 0.1);
-      transform: translateY(-1px)
-    }
-
-    .btn-add:active {
-      transform: scale(.98)
-    }
-
-    .alert {
-      padding: 8px 12px;
-      border-radius: 7px;
-      font-family: var(--mono);
-      font-size: 11px;
-      margin-top: .4rem;
-      display: flex;
-      align-items: center;
-      gap: 7px
-    }
-
-    .alert-warn {
-      background: rgba(255, 179, 71, 0.1);
-      border: 1px solid rgba(255, 179, 71, 0.25);
-      color: var(--warn)
-    }
-
-    .alert-danger {
-      background: rgba(255, 90, 90, 0.1);
-      border: 1px solid rgba(255, 90, 90, 0.25);
-      color: var(--danger)
-    }
-
-    /* ── RIGHT ── */
-    .right {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh
-    }
-
-    @media(max-width:860px) {
-      .right {
-        min-height: auto
-      }
-    }
-
-    .report-header {
-      padding: 1.25rem 1.75rem .9rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px;
-      background: var(--surface);
-      position: sticky;
-      top: 0;
-      z-index: 10
-    }
-
-    @media(max-width:860px) {
-      .report-header {
-        position: static;
-        padding: 1rem .75rem
-      }
-    }
-
-    @media(max-width:500px) {
-      .report-header {
-        flex-direction: column;
-        align-items: flex-start
-      }
-    }
-
-    .report-title {
-      font-size: 17px;
-      font-weight: 700
-    }
-
-    .report-count {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      margin-top: 1px
-    }
-
-    .export-btns {
-      display: flex;
-      gap: 7px;
-      flex-wrap: wrap
-    }
-
-    @media(max-width:500px) {
-      .export-btns {
-        width: 100%
-      }
-
-      .btn-export {
-        flex: 1;
-        justify-content: center
-      }
-    }
-
-    /* Column toggle */
-    .col-toggle-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      padding: 6px 12px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      font-family: var(--mono);
-      font-size: 10px
-    }
-
-    .col-toggle-label {
-      color: var(--muted);
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      margin-right: 4px;
-      white-space: nowrap
-    }
-
-    .col-toggle-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      color: var(--text);
-      padding: 3px 8px;
-      border-radius: 5px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      transition: all .15s;
-      user-select: none
-    }
-
-    .col-toggle-item:hover {
-      border-color: var(--accent);
-      color: var(--accent)
-    }
-
-    .col-toggle-item input[type=checkbox] {
-      accent-color: var(--accent);
-      width: 12px;
-      height: 12px;
-      cursor: pointer
-    }
-
-    .col-toggle-item.checked {
-      border-color: rgba(0, 229, 160, 0.4);
-      background: rgba(0, 229, 160, 0.07);
-      color: var(--accent)
-    }
-
-    .btn-export {
-      padding: 7px 14px;
-      border-radius: 7px;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid;
-      letter-spacing: .04em;
-      transition: all .15s;
-      display: flex;
-      align-items: center;
-      gap: 5px
-    }
-
-    .btn-export-doc {
-      background: rgba(0, 119, 255, 0.1);
-      border-color: rgba(0, 119, 255, 0.4);
-      color: #60aaff
-    }
-
-    .btn-export-doc:hover {
-      background: rgba(0, 119, 255, 0.2)
-    }
-
-    .btn-export-csv {
-      background: rgba(0, 229, 160, 0.08);
-      border-color: rgba(0, 229, 160, 0.3);
-      color: var(--accent)
-    }
-
-    .btn-export-csv:hover {
-      background: rgba(0, 229, 160, 0.15)
-    }
-
-    .btn-clear {
-      background: rgba(255, 90, 90, 0.08);
-      border-color: rgba(255, 90, 90, 0.3);
-      color: var(--danger)
-    }
-
-    .btn-clear:hover {
-      background: rgba(255, 90, 90, 0.15)
-    }
-
-    .table-wrap {
-      flex: 1;
-      overflow-x: auto;
-      overflow-y: auto;
-      padding: 1.5rem 1.75rem
-    }
-
-    @media(max-width:860px) {
-      .table-wrap {
-        padding: 1rem .75rem
-      }
-    }
-
-    .report-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      min-width: 600px
-    }
-
-    .report-table th {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .1em;
-      color: var(--muted);
-      text-transform: uppercase;
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-      white-space: nowrap;
-      background: var(--surface);
-      position: sticky;
-      top: 0
-    }
-
-    .report-table td {
-      padding: 11px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-      color: var(--text)
-    }
-
-    .report-table tr:hover td {
-      background: rgba(255, 255, 255, 0.02)
-    }
-
-    .td-num {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      width: 36px;
-      text-align: center
-    }
-
-    .td-chainage {
-      font-family: var(--mono);
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--accent);
-      white-space: nowrap;
-      letter-spacing: .01em
-    }
-
-    .td-photo img {
-      width: 60px;
-      height: 60px;
-      object-fit: cover;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      display: block
-    }
-
-    .td-photo .no-photo {
-      width: 60px;
-      height: 60px;
-      background: var(--surface2);
-      border-radius: 6px;
-      border: 1px dashed var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px
-    }
-
-    .td-coords {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      line-height: 1.6;
-      white-space: nowrap
-    }
-
-    .td-text {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text);
-      line-height: 1.5;
-      max-width: 180px
-    }
-
-    .td-editable {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text);
-      line-height: 1.5;
-      max-width: 180px;
-      min-width: 100px
-    }
-
-    .td-editable [contenteditable] {
-      outline: none;
-      border-radius: 5px;
-      padding: 3px 6px;
-      min-height: 22px;
-      display: block;
-      transition: background .15s, border .15s;
-      border: 1px solid transparent;
-      white-space: pre-wrap;
-      word-break: break-word
-    }
-
-    .td-editable [contenteditable]:hover {
-      background: rgba(255, 255, 255, 0.04);
-      border-color: var(--border)
-    }
-
-    .td-editable [contenteditable]:focus {
-      background: rgba(0, 229, 160, 0.06);
-      border-color: rgba(0, 229, 160, 0.4);
-      box-shadow: 0 0 0 2px rgba(0, 229, 160, 0.1)
-    }
-
-    .td-editable [contenteditable]:empty::before {
-      content: attr(data-placeholder);
-      color: var(--muted);
-      pointer-events: none
-    }
-
-    .td-del {
-      white-space: nowrap
-    }
-
-    .td-del button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 13px;
-      opacity: .45;
-      transition: opacity .2s, color .15s;
-      padding: 3px 5px;
-      border-radius: 4px;
-      line-height: 1
-    }
-
-    .td-del button:hover {
-      opacity: 1
-    }
-
-    .btn-move {
-      color: var(--muted)
-    }
-
-    .btn-move:hover {
-      color: var(--accent) !important;
-      background: rgba(0, 229, 160, 0.08)
-    }
-
-    .btn-del-row {
-      color: var(--danger)
-    }
-
-    .btn-del-row:hover {
-      color: var(--danger);
-      background: rgba(255, 90, 90, 0.1)
-    }
-
-    .sort-btns {
-      display: flex;
-      gap: 5px;
-      align-items: center
-    }
-
-    .btn-sort {
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--muted);
-      letter-spacing: .04em;
-      transition: all .15s;
-      display: flex;
-      align-items: center;
-      gap: 4px
-    }
-
-    .btn-sort:hover {
-      border-color: var(--accent);
-      color: var(--accent)
-    }
-
-    .btn-sort.active {
-      border-color: rgba(0, 229, 160, 0.5);
-      background: rgba(0, 229, 160, 0.08);
-      color: var(--accent)
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 5rem 2rem;
-      color: var(--muted)
-    }
-
-    .empty-icon {
-      font-size: 44px;
-      margin-bottom: 1rem;
-      display: block;
-      opacity: .5
-    }
-
-    .empty-text {
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height: 1.8
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      background: var(--surface);
-      border: 1px solid var(--accent);
-      border-radius: 9px;
-      padding: 10px 16px;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-      z-index: 999;
-      transform: translateY(16px);
-      opacity: 0;
-      transition: all .3s;
-      pointer-events: none
-    }
-
-    .toast.show {
-      transform: translateY(0);
-      opacity: 1
-    }
-
-    @keyframes rowIn {
-      from {
-        opacity: 0;
-        transform: translateX(-8px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateX(0)
-      }
-    }
-
-    .new-row td {
-      animation: rowIn .3s ease both
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Chainage Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:#2a2f40;
+  --accent:#00e5a0;--text:#e8ecf4;--muted:#6b7490;
+  --warn:#ffb347;--danger:#ff5a5a;--success:#00e5a0;
+  --mono:'IBM Plex Mono',monospace;--display:'Syne',sans-serif;
+}
+body{font-family:var(--display);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+.app{position:relative;z-index:1;display:grid;grid-template-columns:380px 1fr;min-height:100vh}
+@media(max-width:860px){.app{grid-template-columns:1fr}}
+
+/* ── LEFT ── */
+.left{background:var(--surface);border-right:1px solid var(--border);padding:1.75rem 1.25rem;display:flex;flex-direction:column;gap:.9rem;overflow-y:auto;max-height:100vh;position:sticky;top:0}
+.logo{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.logo span{color:var(--accent)}
+.tagline{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;margin-top:2px}
+
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1.1rem}
+.card-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.step-num{width:16px;height:16px;background:var(--accent);color:#000;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+
+.dropzone{border:2px dashed var(--border);border-radius:9px;padding:1.1rem .9rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:var(--bg)}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:rgba(0,229,160,0.04)}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:20px;display:block;margin-bottom:5px}
+.drop-text{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.drop-text strong{color:var(--accent);font-weight:500}
+.drop-formats{font-family:var(--mono);font-size:9px;color:#3a4055;margin-top:3px}
+
+.loaded-pill{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;font-family:var(--mono);font-size:11px}
+.loaded-pill.green{background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);color:var(--accent)}
+.loaded-pill.blue{background:rgba(0,119,255,0.08);border:1px solid rgba(0,119,255,0.25);color:#60aaff}
+.loaded-pill img{width:38px;height:38px;object-fit:cover;border-radius:5px;flex-shrink:0}
+.pill-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.pill-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.pill-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;padding:0}
+
+.divider{display:flex;align-items:center;gap:8px;margin:.6rem 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.divider span{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.1em}
+
+.coord-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:3px}
+.field input,.field textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;transition:border-color .2s}
+.field input:focus,.field textarea:focus{border-color:var(--accent)}
+.field input::placeholder,.field textarea::placeholder{color:#2e3448}
+.field textarea{resize:vertical;min-height:48px}
+
+.btn-find{width:100%;padding:11px;background:var(--accent);color:#000;border:none;border-radius:9px;font-family:var(--display);font-size:13px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .2s;box-shadow:0 0 18px rgba(0,229,160,0.2)}
+.btn-find:hover{transform:translateY(-2px);box-shadow:0 0 28px rgba(0,229,160,0.35)}
+.btn-find:active{transform:scale(.98)}
+
+.result-box{background:linear-gradient(135deg,rgba(0,229,160,0.1),rgba(0,229,160,0.03));border:1px solid rgba(0,229,160,0.3);border-radius:11px;padding:1.1rem;position:relative;overflow:hidden}
+.result-box::after{content:'';position:absolute;top:0;right:0;width:70px;height:100%;background:radial-gradient(ellipse at right,rgba(0,229,160,0.1),transparent 70%)}
+.result-tag{font-family:var(--mono);font-size:9px;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:3px}
+.result-chainage{font-size:1.9rem;font-weight:800;color:var(--accent);letter-spacing:-.02em;margin-bottom:3px}
+.result-dist{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.result-coords{font-family:var(--mono);font-size:10px;color:#3a4055;margin-top:2px}
+
+.issue-fields{display:flex;flex-direction:column;gap:7px}
+.btn-add{width:100%;padding:10px;background:transparent;color:var(--accent);border:1.5px solid var(--accent);border-radius:9px;font-family:var(--display);font-size:13px;font-weight:700;cursor:pointer;transition:background .2s,transform .15s}
+.btn-add:hover{background:rgba(0,229,160,0.1);transform:translateY(-1px)}
+.btn-add:active{transform:scale(.98)}
+
+.alert{padding:8px 12px;border-radius:7px;font-family:var(--mono);font-size:11px;margin-top:.4rem;display:flex;align-items:center;gap:7px}
+.alert-warn{background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.25);color:var(--warn)}
+.alert-danger{background:rgba(255,90,90,0.1);border:1px solid rgba(255,90,90,0.25);color:var(--danger)}
+
+/* ── RIGHT ── */
+.right{display:flex;flex-direction:column;min-height:100vh}
+.report-header{padding:1.25rem 1.75rem .9rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:var(--surface);position:sticky;top:0;z-index:10}
+.report-title{font-size:17px;font-weight:700}
+.report-count{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:1px}
+
+.export-btns{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+
+/* Photo size bar — export only */
+.photo-size-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px}
+.photo-size-label{color:var(--muted);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.photo-mode-group{display:flex;gap:4px}
+.photo-mode-btn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;font-family:var(--mono);font-size:10px;transition:all .15s;white-space:nowrap}
+.photo-mode-btn:hover{border-color:var(--accent);color:var(--accent)}
+.photo-mode-btn.active{border-color:rgba(0,229,160,0.5);background:rgba(0,229,160,0.1);color:var(--accent)}
+.photo-size-inputs{display:flex;align-items:center;gap:5px}
+.photo-size-inputs label{color:var(--muted);font-size:10px;white-space:nowrap}
+.photo-size-inputs input[type=number]{width:58px;background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;transition:border-color .2s;-moz-appearance:textfield;text-align:center}
+.photo-size-inputs input[type=number]::-webkit-outer-spin-button,.photo-size-inputs input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+.photo-size-inputs input[type=number]:focus{border-color:var(--accent)}
+.photo-size-inputs .sep{color:var(--border);font-size:13px}
+.photo-size-note{color:#3a4055;font-size:9px;letter-spacing:.06em;margin-left:2px}
+
+/* Column toggle */
+.col-toggle-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px}
+.col-toggle-label{color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-right:4px;white-space:nowrap}
+.col-toggle-item{display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text);padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg);transition:all .15s;user-select:none}
+.col-toggle-item:hover{border-color:var(--accent);color:var(--accent)}
+.col-toggle-item input[type=checkbox]{accent-color:var(--accent);width:12px;height:12px;cursor:pointer}
+.col-toggle-item.checked{border-color:rgba(0,229,160,0.4);background:rgba(0,229,160,0.07);color:var(--accent)}
+.btn-export{padding:7px 14px;border-radius:7px;font-family:var(--mono);font-size:10px;font-weight:500;cursor:pointer;border:1px solid;letter-spacing:.04em;transition:all .15s;display:flex;align-items:center;gap:5px}
+.btn-export-doc{background:rgba(0,119,255,0.1);border-color:rgba(0,119,255,0.4);color:#60aaff}
+.btn-export-doc:hover{background:rgba(0,119,255,0.2)}
+.btn-export-csv{background:rgba(0,229,160,0.08);border-color:rgba(0,229,160,0.3);color:var(--accent)}
+.btn-export-csv:hover{background:rgba(0,229,160,0.15)}
+.btn-clear{background:rgba(255,90,90,0.08);border-color:rgba(255,90,90,0.3);color:var(--danger)}
+.btn-clear:hover{background:rgba(255,90,90,0.15)}
+
+.table-wrap{flex:1;overflow-x:auto;overflow-y:auto;padding:1.5rem 1.75rem}
+
+.report-table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+.report-table th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;padding:9px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+.report-table td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text)}
+.report-table tr:hover td{background:rgba(255,255,255,0.02)}
+
+.td-num{font-family:var(--mono);font-size:11px;color:var(--muted);width:36px;text-align:center}
+.td-chainage{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;letter-spacing:.01em}
+.td-photo img{width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block}
+.td-photo .no-photo{width:60px;height:60px;background:var(--surface2);border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:16px}
+.td-coords{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.6;white-space:nowrap}
+.td-text{font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.5;max-width:180px}
+.td-editable{font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.5;max-width:180px;min-width:100px}
+.td-editable [contenteditable]{outline:none;border-radius:5px;padding:3px 6px;min-height:22px;display:block;transition:background .15s,border .15s;border:1px solid transparent;white-space:pre-wrap;word-break:break-word}
+.td-editable [contenteditable]:hover{background:rgba(255,255,255,0.04);border-color:var(--border)}
+.td-editable [contenteditable]:focus{background:rgba(0,229,160,0.06);border-color:rgba(0,229,160,0.4);box-shadow:0 0 0 2px rgba(0,229,160,0.1)}
+.td-editable [contenteditable]:empty::before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}
+.td-del button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;opacity:.4;transition:opacity .2s;padding:4px}
+.td-del button:hover{opacity:1}
+
+.empty-state{text-align:center;padding:5rem 2rem;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:1rem;display:block;opacity:.5}
+.empty-text{font-family:var(--mono);font-size:12px;line-height:1.8}
+
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--surface);border:1px solid var(--accent);border-radius:9px;padding:10px 16px;font-family:var(--mono);font-size:11px;color:var(--accent);z-index:999;transform:translateY(16px);opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+
+@keyframes rowIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.new-row td{animation:rowIn .3s ease both}
+</style>
 </head>
-
 <body>
-  <div class="app">
+<div class="app">
 
-    <!-- ══ LEFT PANEL ══ -->
-    <div class="left">
-      <div>
-        <div class="logo">Chainage<span>Finder</span></div>
-        <div class="tagline">SURVEY REPORT TOOL</div>
-        <div class="card-title">by Chandrabhushan Kumar</div>
+  <!-- ══ LEFT PANEL ══ -->
+  <div class="left">
+    <div>
+      <div class="logo">Chainage<span>Finder</span></div>
+      <div class="tagline">SURVEY REPORT TOOL</div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="card">
+      <div class="card-label"><span class="step-num">1</span> Map File</div>
+      <div class="card-title">Upload KML or KMZ</div>
+      <div id="kmlDropzone" class="dropzone">
+        <input type="file" id="kmlFile" accept=".kml,.kmz"/>
+        <span class="drop-icon">📂</span>
+        <div class="drop-text"><strong>Click to browse</strong> or drag & drop</div>
+        <div class="drop-formats">Accepts: .kml · .kmz</div>
       </div>
+      <div id="kmlLoaded" style="display:none;margin-top:8px;"></div>
+      <div id="kmlMsg"></div>
+    </div>
 
-      <!-- Step 1 -->
-      <div class="card">
-        <div class="card-label"><span class="step-num">1</span> Map File</div>
-        <div class="card-title">Upload KML or KMZ</div>
-        <div id="kmlDropzone" class="dropzone">
-          <input type="file" id="kmlFile" accept=".kml,.kmz" />
-          <span class="drop-icon">📂</span>
-          <div class="drop-text"><strong>Click to browse</strong> or drag & drop</div>
-          <div class="drop-formats">Accepts: .kml · .kmz</div>
-        </div>
-        <div id="kmlLoaded" style="display:none;margin-top:8px;"></div>
-        <div id="kmlMsg"></div>
+    <!-- Step 2 -->
+    <div class="card">
+      <div class="card-label"><span class="step-num">2</span> Your Location</div>
+      <div class="card-title">Upload photo or enter coordinates</div>
+      <div id="imgDropzone" class="dropzone">
+        <input type="file" id="imgFile" accept="image/*"/>
+        <span class="drop-icon">📷</span>
+        <div class="drop-text"><strong>Upload photo</strong> — reads GPS from EXIF</div>
+        <div class="drop-formats">JPEG / PNG with location enabled</div>
       </div>
-
-      <!-- Step 2 -->
-      <div class="card">
-        <div class="card-label"><span class="step-num">2</span> Your Location</div>
-        <div class="card-title">Upload photo or enter coordinates</div>
-        <div id="imgDropzone" class="dropzone">
-          <input type="file" id="imgFile" accept="image/*" multiple />
-          <span class="drop-icon">📷</span>
-          <div class="drop-text"><strong>Upload photo(s)</strong> — reads GPS from EXIF</div>
-          <div class="drop-formats">Select multiple · JPEG / PNG with location enabled</div>
-        </div>
-        <div id="imgLoaded" style="display:none;margin-top:8px;"></div>
-        <div id="imgMsg"></div>
-        <div class="divider"><span>OR ENTER MANUALLY</span></div>
-        <div class="coord-row">
-          <div class="field"><label>Latitude</label><input type="number" id="lat" step="any" placeholder="11.7034" />
-          </div>
-          <div class="field"><label>Longitude</label><input type="number" id="lng" step="any" placeholder="76.0088" />
-          </div>
-        </div>
-      </div>
-
-      <button class="btn-find" onclick="findChainage()">Find Nearest Chainage →</button>
-
-      <!-- Result + Add to Report -->
-      <div id="resultSection" style="display:none;display:flex;flex-direction:column;gap:.75rem;">
-        <div class="result-box">
-          <div class="result-tag">◈ Nearest Chainage</div>
-          <div class="result-chainage" id="resChain">—</div>
-          <div class="result-dist" id="resDist"></div>
-          <div class="result-coords" id="resCoords"></div>
-        </div>
-        <div class="issue-fields">
-          <div class="field"><label>Issue / Observation</label><textarea id="issueText"
-              placeholder="Describe the issue at this chainage…"></textarea></div>
-          <div class="field"><label>Solution / Remarks</label><textarea id="solutionText"
-              placeholder="Proposed solution or remarks…"></textarea></div>
-        </div>
-        <button class="btn-add" onclick="addToReport()">＋ Add to Report</button>
+      <div id="imgLoaded" style="display:none;margin-top:8px;"></div>
+      <div id="imgMsg"></div>
+      <div class="divider"><span>OR ENTER MANUALLY</span></div>
+      <div class="coord-row">
+        <div class="field"><label>Latitude</label><input type="number" id="lat" step="any" placeholder="11.7034"/></div>
+        <div class="field"><label>Longitude</label><input type="number" id="lng" step="any" placeholder="76.0088"/></div>
       </div>
     </div>
 
-    <!-- ══ RIGHT PANEL ══ -->
-    <div class="right">
-      <div class="report-header">
-        <div>
-          <div class="report-title">Site Report</div>
-          <div class="report-count" id="reportCount">0 entries</div>
-        </div>
-        <div class="export-btns">
-          <div class="sort-btns">
-            <button class="btn-sort" id="sortAsc" onclick="sortReport('asc')" title="Sort ascending by chainage">↑
-              Asc</button>
-            <button class="btn-sort" id="sortDesc" onclick="sortReport('desc')" title="Sort descending by chainage">↓
-              Desc</button>
-          </div>
-          <button class="btn-export btn-export-doc" onclick="exportDoc()">⬇ Export DOC</button>
-          <button class="btn-export btn-export-csv" onclick="exportCSV()">⬇ Export CSV</button>
-          <button class="btn-export btn-clear" onclick="clearReport()">✕ Clear All</button>
-        </div>
-      </div>
-      <!-- Column visibility toggles -->
-      <div class="col-toggle-wrap">
-        <span class="col-toggle-label">Columns:</span>
-        <label class="col-toggle-item checked" id="tog-sl"><input type="checkbox" checked
-            onchange="toggleCol('sl',this)" /> Sl No</label>
-        <label class="col-toggle-item checked" id="tog-chainage"><input type="checkbox" checked
-            onchange="toggleCol('chainage',this)" /> Chainage</label>
-        <label class="col-toggle-item checked" id="tog-photo"><input type="checkbox" checked
-            onchange="toggleCol('photo',this)" /> Photo</label>
-        <label class="col-toggle-item checked" id="tog-coords"><input type="checkbox" checked
-            onchange="toggleCol('coords',this)" /> Coordinates</label>
-        <label class="col-toggle-item checked" id="tog-issue"><input type="checkbox" checked
-            onchange="toggleCol('issue',this)" /> Issue</label>
-        <label class="col-toggle-item checked" id="tog-solution"><input type="checkbox" checked
-            onchange="toggleCol('solution',this)" /> Solution</label>
-      </div>
+    <button class="btn-find" onclick="findChainage()">Find Nearest Chainage →</button>
 
-      <div class="table-wrap">
-        <div id="emptyState" class="empty-state">
-          <span class="empty-icon">📋</span>
-          <div class="empty-text">No entries yet.<br>Find a chainage then click<br><strong
-              style="color:var(--accent)">"Add to Report"</strong></div>
-        </div>
-        <table class="report-table" id="reportTable" style="display:none;">
-          <thead>
-            <tr>
-              <th class="td-num col-sl">#</th>
-              <th class="col-chainage">Chainage</th>
-              <th class="col-photo">Photo</th>
-              <th class="col-coords">Coordinates</th>
-              <th class="col-issue">Issue</th>
-              <th class="col-solution">Solution</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="reportBody"></tbody>
-        </table>
+    <!-- Result + Add to Report -->
+    <div id="resultSection" style="display:none;display:flex;flex-direction:column;gap:.75rem;">
+      <div class="result-box">
+        <div class="result-tag">◈ Nearest Chainage</div>
+        <div class="result-chainage" id="resChain">—</div>
+        <div class="result-dist" id="resDist"></div>
+        <div class="result-coords" id="resCoords"></div>
       </div>
+      <div class="issue-fields">
+        <div class="field"><label>Issue / Observation</label><textarea id="issueText" placeholder="Describe the issue at this chainage…"></textarea></div>
+        <div class="field"><label>Solution / Remarks</label><textarea id="solutionText" placeholder="Proposed solution or remarks…"></textarea></div>
+      </div>
+      <button class="btn-add" onclick="addToReport()">＋ Add to Report</button>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <!-- ══ RIGHT PANEL ══ -->
+  <div class="right">
+    <div class="report-header">
+      <div>
+        <div class="report-title">Site Report</div>
+        <div class="report-count" id="reportCount">0 entries</div>
+      </div>
+      <div class="export-btns">
+        <button class="btn-export btn-export-doc" onclick="exportDoc()">⬇ Export DOC</button>
+        <button class="btn-export btn-export-csv" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn-export btn-clear" onclick="clearReport()">✕ Clear All</button>
+      </div>
+    </div>
+    <!-- Export photo size (affects DOC export only, not web preview) -->
+    <div class="photo-size-bar">
+      <span class="photo-size-label">📷 Export photo:</span>
+      <div class="photo-mode-group">
+        <button class="photo-mode-btn active" id="pmBtn-ratio" onclick="setPhotoMode('ratio')">Fix Ratio</button>
+        <button class="photo-mode-btn" id="pmBtn-width" onclick="setPhotoMode('width')">Fix Width</button>
+        <button class="photo-mode-btn" id="pmBtn-height" onclick="setPhotoMode('height')">Fix Height</button>
+        <button class="photo-mode-btn" id="pmBtn-manual" onclick="setPhotoMode('manual')">Manual W×H</button>
+      </div>
+      <div class="photo-size-inputs" id="photoSizeInputs"></div>
+      <span class="photo-size-note">(export only)</span>
+    </div>
+    <!-- Column visibility toggles -->
+    <div class="col-toggle-wrap">
+      <span class="col-toggle-label">Columns:</span>
+      <label class="col-toggle-item checked" id="tog-sl"><input type="checkbox" checked onchange="toggleCol('sl',this)"/> Sl No</label>
+      <label class="col-toggle-item checked" id="tog-chainage"><input type="checkbox" checked onchange="toggleCol('chainage',this)"/> Chainage</label>
+      <label class="col-toggle-item checked" id="tog-photo"><input type="checkbox" checked onchange="toggleCol('photo',this)"/> Photo</label>
+      <label class="col-toggle-item checked" id="tog-coords"><input type="checkbox" checked onchange="toggleCol('coords',this)"/> Coordinates</label>
+      <label class="col-toggle-item checked" id="tog-issue"><input type="checkbox" checked onchange="toggleCol('issue',this)"/> Issue</label>
+      <label class="col-toggle-item checked" id="tog-solution"><input type="checkbox" checked onchange="toggleCol('solution',this)"/> Solution</label>
+    </div>
 
-  <script>
-    let chainagePoints = [], reportRows = [], currentResult = null, currentPhotoDataUrl = null;
+    <div class="table-wrap">
+      <div id="emptyState" class="empty-state">
+        <span class="empty-icon">📋</span>
+        <div class="empty-text">No entries yet.<br>Find a chainage then click<br><strong style="color:var(--accent)">"Add to Report"</strong></div>
+      </div>
+      <table class="report-table" id="reportTable" style="display:none;">
+        <thead>
+          <tr>
+            <th class="td-num col-sl">#</th>
+            <th class="col-chainage">Chainage</th>
+            <th class="col-photo">Photo</th>
+            <th class="col-coords">Coordinates</th>
+            <th class="col-issue">Issue</th>
+            <th class="col-solution">Solution</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-    // ── KML drag/drop ─────────────────────────────────────────────────
-    const kmlDz = document.getElementById('kmlDropzone');
-    kmlDz.addEventListener('dragover', e => { e.preventDefault(); kmlDz.classList.add('drag-over') });
-    kmlDz.addEventListener('dragleave', () => kmlDz.classList.remove('drag-over'));
-    kmlDz.addEventListener('drop', e => { e.preventDefault(); kmlDz.classList.remove('drag-over'); handleKML(e.dataTransfer.files[0]) });
-    document.getElementById('kmlFile').addEventListener('change', e => { if (e.target.files[0]) handleKML(e.target.files[0]) });
+<div class="toast" id="toast"></div>
 
-    async function handleKML(file) {
-      if (!file) return;
-      chainagePoints = [];
-      document.getElementById('kmlLoaded').style.display = 'none';
-      kmlDz.style.display = '';
-      document.getElementById('kmlMsg').innerHTML = '';
-      try {
-        let txt = '';
-        if (file.name.toLowerCase().endsWith('.kmz')) {
-          const zip = await JSZip.loadAsync(await file.arrayBuffer());
-          for (const fn of Object.keys(zip.files)) { if (fn.toLowerCase().endsWith('.kml')) { txt = await zip.files[fn].async('string'); break } }
-          if (!txt) { showMsg('kmlMsg', '⚠ No KML inside KMZ', 'warn'); return }
-        } else { txt = await file.text() }
-        chainagePoints = parseKML(txt);
-        if (!chainagePoints.length) { showMsg('kmlMsg', '⚠ No coordinate points found', 'warn'); return }
-        kmlDz.style.display = 'none';
-        document.getElementById('kmlLoaded').style.display = 'block';
-        document.getElementById('kmlLoaded').innerHTML = `<div class="loaded-pill green"><span>📂</span><div><div class="pill-name">${file.name}</div><div class="pill-sub">${chainagePoints.length} points loaded</div></div><button class="pill-x" onclick="resetKML()">×</button></div>`;
-      } catch (e) { showMsg('kmlMsg', '✗ ' + e.message, 'danger') }
-    }
-    function resetKML() { chainagePoints = []; document.getElementById('kmlLoaded').style.display = 'none'; kmlDz.style.display = ''; document.getElementById('kmlFile').value = '' }
+<script>
+let chainagePoints=[], reportRows=[], currentResult=null, currentPhotoDataUrl=null;
 
-    // ── Image / EXIF ──────────────────────────────────────────────────
-    const imgDz = document.getElementById('imgDropzone');
-    imgDz.addEventListener('dragover', e => { e.preventDefault(); imgDz.classList.add('drag-over') });
-    imgDz.addEventListener('dragleave', () => imgDz.classList.remove('drag-over'));
-    imgDz.addEventListener('drop', e => { e.preventDefault(); imgDz.classList.remove('drag-over'); handleImages(e.dataTransfer.files) });
-    document.getElementById('imgFile').addEventListener('change', e => { if (e.target.files.length) handleImages(e.target.files) });
+// ── KML drag/drop ─────────────────────────────────────────────────
+const kmlDz=document.getElementById('kmlDropzone');
+kmlDz.addEventListener('dragover',e=>{e.preventDefault();kmlDz.classList.add('drag-over')});
+kmlDz.addEventListener('dragleave',()=>kmlDz.classList.remove('drag-over'));
+kmlDz.addEventListener('drop',e=>{e.preventDefault();kmlDz.classList.remove('drag-over');handleKML(e.dataTransfer.files[0])});
+document.getElementById('kmlFile').addEventListener('change',e=>{if(e.target.files[0])handleKML(e.target.files[0])});
 
-    async function handleImages(files) {
-      if (!files || !files.length) return;
-      const arr = Array.from(files);
-      if (arr.length === 1) {
-        handleImage(arr[0]);
-      } else {
-        resetImage();
-        toast(`Processing ${arr.length} images...`);
-        let added = 0;
-        for (const file of arr) {
-          try {
-            const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file) });
-            const exif = await exifr.parse(file, { gps: true, pick: ['latitude', 'longitude', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'] }).catch(() => null);
-            let lat = null, lon = null, chain = '—', dst = '—';
-            if (exif) {
-              lat = exif.latitude; lon = exif.longitude;
-              if (lat == null && exif.GPSLatitude) { lat = dms(exif.GPSLatitude, exif.GPSLatitudeRef); lon = dms(exif.GPSLongitude, exif.GPSLongitudeRef) }
-              if (lat != null && !isNaN(lat) && chainagePoints.length) {
-                const scored = chainagePoints.map(p => ({ ...p, dist: haversine(lat, lon, p.lat, p.lon) })).sort((a, b) => a.dist - b.dist);
-                chain = scored[0].chainage; dst = fmtDist(scored[0].dist);
-              }
-            }
-            reportRows.push({ id: Date.now() + Math.random(), sl: reportRows.length + 1, chainage: chain, dist: dst, lat: lat != null ? lat.toFixed(6) : '—', lon: lon != null ? lon.toFixed(6) : '—', photo: dataUrl, issue: '', solution: '' });
-            added++;
-          } catch (e) { }
-        }
-        if (added > 0) {
-          reportRows.forEach((r, i) => r.sl = i + 1);
-          renderTable();
-          toast(`✓ ${added} entries added directly`);
-        }
-      }
-    }
+async function handleKML(file){
+  if(!file)return;
+  chainagePoints=[];
+  document.getElementById('kmlLoaded').style.display='none';
+  kmlDz.style.display='';
+  document.getElementById('kmlMsg').innerHTML='';
+  try{
+    let txt='';
+    if(file.name.toLowerCase().endsWith('.kmz')){
+      const zip=await JSZip.loadAsync(await file.arrayBuffer());
+      for(const fn of Object.keys(zip.files)){if(fn.toLowerCase().endsWith('.kml')){txt=await zip.files[fn].async('string');break}}
+      if(!txt){showMsg('kmlMsg','⚠ No KML inside KMZ','warn');return}
+    }else{txt=await file.text()}
+    chainagePoints=parseKML(txt);
+    if(!chainagePoints.length){showMsg('kmlMsg','⚠ No coordinate points found','warn');return}
+    kmlDz.style.display='none';
+    document.getElementById('kmlLoaded').style.display='block';
+    document.getElementById('kmlLoaded').innerHTML=`<div class="loaded-pill green"><span>📂</span><div><div class="pill-name">${file.name}</div><div class="pill-sub">${chainagePoints.length} points loaded</div></div><button class="pill-x" onclick="resetKML()">×</button></div>`;
+  }catch(e){showMsg('kmlMsg','✗ '+e.message,'danger')}
+}
+function resetKML(){chainagePoints=[];document.getElementById('kmlLoaded').style.display='none';kmlDz.style.display='';document.getElementById('kmlFile').value=''}
 
-    async function handleImage(file) {
-      if (!file) return;
-      currentPhotoDataUrl = null;
-      document.getElementById('imgLoaded').style.display = 'none';
-      imgDz.style.display = '';
-      const reader = new FileReader();
-      reader.onload = async ev => {
-        currentPhotoDataUrl = ev.target.result;
-        imgDz.style.display = 'none';
-        document.getElementById('imgLoaded').style.display = 'block';
-        document.getElementById('imgLoaded').innerHTML = `<div class="loaded-pill blue"><img src="${ev.target.result}"/><div style="flex:1;min-width:0"><div class="pill-name">${file.name}</div><div class="pill-sub" id="exifStatus">Reading GPS…</div></div><button class="pill-x" onclick="resetImage()">×</button></div>`;
-        try {
-          const exif = await exifr.parse(file, { gps: true, pick: ['latitude', 'longitude', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'] });
-          const st = document.getElementById('exifStatus');
-          if (!exif || (exif.latitude == null && exif.GPSLatitude == null)) { if (st) { st.style.color = 'var(--warn)'; st.textContent = '⚠ No GPS in this image' } return }
-          let lat = exif.latitude, lon = exif.longitude;
-          if (lat == null && exif.GPSLatitude) { lat = dms(exif.GPSLatitude, exif.GPSLatitudeRef); lon = dms(exif.GPSLongitude, exif.GPSLongitudeRef) }
-          if (lat == null || isNaN(lat)) { if (st) { st.style.color = 'var(--warn)'; st.textContent = '⚠ Could not parse GPS' } return }
-          document.getElementById('lat').value = lat.toFixed(8);
-          document.getElementById('lng').value = lon.toFixed(8);
-          if (st) { st.style.color = 'var(--success)'; st.textContent = `✓ GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}` }
-          if (chainagePoints.length > 0) findChainage();
-        } catch (e) { const st = document.getElementById('exifStatus'); if (st) { st.style.color = 'var(--danger)'; st.textContent = '✗ ' + e.message } }
-      };
-      reader.readAsDataURL(file);
-    }
-    function dms(a, r) { if (!a || a.length < 3) return null; const d = a[0] + a[1] / 60 + a[2] / 3600; return (r === 'S' || r === 'W') ? -d : d }
-    function resetImage() { currentPhotoDataUrl = null; document.getElementById('imgLoaded').style.display = 'none'; imgDz.style.display = ''; document.getElementById('imgFile').value = ''; document.getElementById('lat').value = ''; document.getElementById('lng').value = '' }
+// ── Image / EXIF ──────────────────────────────────────────────────
+const imgDz=document.getElementById('imgDropzone');
+imgDz.addEventListener('dragover',e=>{e.preventDefault();imgDz.classList.add('drag-over')});
+imgDz.addEventListener('dragleave',()=>imgDz.classList.remove('drag-over'));
+imgDz.addEventListener('drop',e=>{e.preventDefault();imgDz.classList.remove('drag-over');handleImage(e.dataTransfer.files[0])});
+document.getElementById('imgFile').addEventListener('change',e=>{if(e.target.files[0])handleImage(e.target.files[0])});
 
-    // ── KML Parser ────────────────────────────────────────────────────
-    function normalizeChainage(raw) {
-      if (!raw) return null;
-      const s = raw.trim();
-      if (/^\d{1,4}\+\d{3,4}$/.test(s)) return s;
-      if (/^\d{1,4}[\/\-:]\d{3,4}$/.test(s)) return s.replace(/[\/\-:]/, '+');
-      if (/^\d{4,7}$/.test(s)) { const n = parseInt(s); return `${Math.floor(n / 1000)}+${String(n % 1000).padStart(3, '0')}` }
-      if (/^\d+\.\d{3}$/.test(s)) { const [k, m] = s.split('.'); return `${k}+${m}` }
-      const km = s.match(/^(\d+)\.(\d{1,2})$/);
-      if (km) return `${km[1]}+${km[2].padEnd(3, '0')}`;
-      return s;
-    }
-    function extractChainage(text) {
-      const t = (text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      const pats = [/Ch(?:ainage)?[\s.:]*(\d{1,4}[+\/\-:]\d{3,4})/i, /\b(\d{1,4}[+\/\-:]\d{3,4})\b/, /\b(\d{1,4}\.\d{3})\s*km/i, /km[\s.:]*(\d{1,4}\.\d{3})/i, /\b(\d{4,7})\b/];
-      for (const p of pats) { const m = t.match(p); if (m) { const n = normalizeChainage((m[1] || m[0]).trim()); if (n) return n } }
-      return null;
-    }
-    function parseCoord(s) { const p = (s || '').trim().split(','); if (p.length < 2) return null; const lon = parseFloat(p[0]), lat = parseFloat(p[1]); return (isNaN(lat) || isNaN(lon)) ? null : { lat, lon } }
-    function parseKML(xml) {
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
-      const pts = [];
-      doc.querySelectorAll('Placemark').forEach(pm => {
-        const name = pm.querySelector('name')?.textContent?.trim() || '';
-        const desc = pm.querySelector('description')?.textContent || '';
-        const label = extractChainage(name + ' ' + desc) || normalizeChainage(name) || name || '—';
-        const pt = pm.querySelector('Point > coordinates');
-        if (pt) { const c = parseCoord(pt.textContent); if (c) { pts.push({ lat: c.lat, lon: c.lon, chainage: label, name }); return } }
-        const ln = pm.querySelector('LineString > coordinates');
-        if (ln) { const t = ln.textContent.trim().split(/\s+/).filter(Boolean); if (t.length) { const c = parseCoord(t[0]); if (c) pts.push({ lat: c.lat, lon: c.lon, chainage: label, name }) } }
-      });
-      return pts;
-    }
+async function handleImage(file){
+  if(!file)return;
+  currentPhotoDataUrl=null;
+  document.getElementById('imgLoaded').style.display='none';
+  imgDz.style.display='';
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    currentPhotoDataUrl=ev.target.result;
+    imgDz.style.display='none';
+    document.getElementById('imgLoaded').style.display='block';
+    document.getElementById('imgLoaded').innerHTML=`<div class="loaded-pill blue"><img src="${ev.target.result}"/><div style="flex:1;min-width:0"><div class="pill-name">${file.name}</div><div class="pill-sub" id="exifStatus">Reading GPS…</div></div><button class="pill-x" onclick="resetImage()">×</button></div>`;
+    try{
+      const exif=await exifr.parse(file,{gps:true,pick:['latitude','longitude','GPSLatitude','GPSLongitude','GPSLatitudeRef','GPSLongitudeRef']});
+      const st=document.getElementById('exifStatus');
+      if(!exif||(exif.latitude==null&&exif.GPSLatitude==null)){if(st){st.style.color='var(--warn)';st.textContent='⚠ No GPS in this image'}return}
+      let lat=exif.latitude,lon=exif.longitude;
+      if(lat==null&&exif.GPSLatitude){lat=dms(exif.GPSLatitude,exif.GPSLatitudeRef);lon=dms(exif.GPSLongitude,exif.GPSLongitudeRef)}
+      if(lat==null||isNaN(lat)){if(st){st.style.color='var(--warn)';st.textContent='⚠ Could not parse GPS'}return}
+      document.getElementById('lat').value=lat.toFixed(8);
+      document.getElementById('lng').value=lon.toFixed(8);
+      if(st){st.style.color='var(--success)';st.textContent=`✓ GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}`}
+      if(chainagePoints.length>0)findChainage();
+    }catch(e){const st=document.getElementById('exifStatus');if(st){st.style.color='var(--danger)';st.textContent='✗ '+e.message}}
+  };
+  reader.readAsDataURL(file);
+}
+function dms(a,r){if(!a||a.length<3)return null;const d=a[0]+a[1]/60+a[2]/3600;return(r==='S'||r==='W')?-d:d}
+function resetImage(){currentPhotoDataUrl=null;document.getElementById('imgLoaded').style.display='none';imgDz.style.display='';document.getElementById('imgFile').value='';document.getElementById('lat').value='';document.getElementById('lng').value=''}
 
-    // ── Haversine ─────────────────────────────────────────────────────
-    function haversine(a, b, c, d) { const R = 6371000, dL = (c - a) * Math.PI / 180, dN = (d - b) * Math.PI / 180, x = Math.sin(dL / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(dN / 2) ** 2; return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
-    function fmtDist(d) { return d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(3) + ' km' }
+// ── KML Parser ────────────────────────────────────────────────────
+function normalizeChainage(raw){
+  if(!raw)return null;
+  const s=raw.trim();
+  if(/^\d{1,4}\+\d{3,4}$/.test(s))return s;
+  if(/^\d{1,4}[\/\-:]\d{3,4}$/.test(s))return s.replace(/[\/\-:]/,'+');
+  if(/^\d{4,7}$/.test(s)){const n=parseInt(s);return `${Math.floor(n/1000)}+${String(n%1000).padStart(3,'0')}`}
+  if(/^\d+\.\d{3}$/.test(s)){const[k,m]=s.split('.');return `${k}+${m}`}
+  const km=s.match(/^(\d+)\.(\d{1,2})$/);
+  if(km)return `${km[1]}+${km[2].padEnd(3,'0')}`;
+  return s;
+}
+function extractChainage(text){
+  const t=(text||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  const pats=[/Ch(?:ainage)?[\s.:]*(\d{1,4}[+\/\-:]\d{3,4})/i,/\b(\d{1,4}[+\/\-:]\d{3,4})\b/,/\b(\d{1,4}\.\d{3})\s*km/i,/km[\s.:]*(\d{1,4}\.\d{3})/i,/\b(\d{4,7})\b/];
+  for(const p of pats){const m=t.match(p);if(m){const n=normalizeChainage((m[1]||m[0]).trim());if(n)return n}}
+  return null;
+}
+function parseCoord(s){const p=(s||'').trim().split(',');if(p.length<2)return null;const lon=parseFloat(p[0]),lat=parseFloat(p[1]);return(isNaN(lat)||isNaN(lon))?null:{lat,lon}}
+function parseKML(xml){
+  const doc=new DOMParser().parseFromString(xml,'text/xml');
+  const pts=[];
+  doc.querySelectorAll('Placemark').forEach(pm=>{
+    const name=pm.querySelector('name')?.textContent?.trim()||'';
+    const desc=pm.querySelector('description')?.textContent||'';
+    const label=extractChainage(name+' '+desc)||normalizeChainage(name)||name||'—';
+    const pt=pm.querySelector('Point > coordinates');
+    if(pt){const c=parseCoord(pt.textContent);if(c){pts.push({lat:c.lat,lon:c.lon,chainage:label,name});return}}
+    const ln=pm.querySelector('LineString > coordinates');
+    if(ln){const t=ln.textContent.trim().split(/\s+/).filter(Boolean);if(t.length){const c=parseCoord(t[0]);if(c)pts.push({lat:c.lat,lon:c.lon,chainage:label,name})}}
+  });
+  return pts;
+}
 
-    // ── Find ──────────────────────────────────────────────────────────
-    function findChainage() {
-      const lat = parseFloat(document.getElementById('lat').value);
-      const lng = parseFloat(document.getElementById('lng').value);
-      if (isNaN(lat) || isNaN(lng)) { toast('Enter valid coordinates', 'warn'); return }
-      if (!chainagePoints.length) { toast('Upload a KML/KMZ file first', 'warn'); return }
-      const scored = chainagePoints.map(p => ({ ...p, dist: haversine(lat, lng, p.lat, p.lon) })).sort((a, b) => a.dist - b.dist);
-      currentResult = { ...scored[0], inputLat: lat, inputLng: lng };
-      document.getElementById('resChain').textContent = currentResult.chainage;
-      document.getElementById('resDist').textContent = 'Distance: ' + fmtDist(currentResult.dist);
-      document.getElementById('resCoords').textContent = `Point: ${currentResult.lat.toFixed(6)}, ${currentResult.lon.toFixed(6)}`;
-      document.getElementById('resultSection').style.display = 'flex';
-    }
+// ── Haversine ─────────────────────────────────────────────────────
+function haversine(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function fmtDist(d){return d<1000?Math.round(d)+' m':(d/1000).toFixed(3)+' km'}
 
-    // ── Add to Report ─────────────────────────────────────────────────
-    function addToReport() {
-      if (!currentResult) { toast('Find a chainage first', 'warn'); return }
-      const row = { id: Date.now(), sl: reportRows.length + 1, chainage: currentResult.chainage, dist: fmtDist(currentResult.dist), lat: currentResult.lat.toFixed(6), lon: currentResult.lon.toFixed(6), photo: currentPhotoDataUrl || null, issue: document.getElementById('issueText').value.trim(), solution: document.getElementById('solutionText').value.trim() };
-      reportRows.push(row);
-      renderTable();
-      document.getElementById('issueText').value = '';
-      document.getElementById('solutionText').value = '';
-      toast('✓ Entry added to report');
-    }
+// ── Find ──────────────────────────────────────────────────────────
+function findChainage(){
+  const lat=parseFloat(document.getElementById('lat').value);
+  const lng=parseFloat(document.getElementById('lng').value);
+  if(isNaN(lat)||isNaN(lng)){toast('Enter valid coordinates','warn');return}
+  if(!chainagePoints.length){toast('Upload a KML/KMZ file first','warn');return}
+  const scored=chainagePoints.map(p=>({...p,dist:haversine(lat,lng,p.lat,p.lon)})).sort((a,b)=>a.dist-b.dist);
+  currentResult={...scored[0],inputLat:lat,inputLng:lng};
+  document.getElementById('resChain').textContent=currentResult.chainage;
+  document.getElementById('resDist').textContent='Distance: '+fmtDist(currentResult.dist);
+  document.getElementById('resCoords').textContent=`Point: ${currentResult.lat.toFixed(6)}, ${currentResult.lon.toFixed(6)}`;
+  document.getElementById('resultSection').style.display='flex';
+}
 
-    function deleteRow(id) { reportRows = reportRows.filter(r => r.id !== id); reportRows.forEach((r, i) => r.sl = i + 1); renderTable() }
-    function clearReport() { if (!reportRows.length) return; if (!confirm('Clear all report entries?')) return; reportRows = []; renderTable() }
+// ── Add to Report ─────────────────────────────────────────────────
+function addToReport(){
+  if(!currentResult){toast('Find a chainage first','warn');return}
+  const row={id:Date.now(),sl:reportRows.length+1,chainage:currentResult.chainage,dist:fmtDist(currentResult.dist),lat:currentResult.lat.toFixed(6),lon:currentResult.lon.toFixed(6),photo:currentPhotoDataUrl||null,issue:document.getElementById('issueText').value.trim(),solution:document.getElementById('solutionText').value.trim()};
+  reportRows.push(row);
+  renderTable();
+  document.getElementById('issueText').value='';
+  document.getElementById('solutionText').value='';
+  toast('✓ Entry added to report');
+}
 
-    function moveRow(id, dir) {
-      const i = reportRows.findIndex(r => r.id === id);
-      const j = i + dir;
-      if (j < 0 || j >= reportRows.length) return;
-      [reportRows[i], reportRows[j]] = [reportRows[j], reportRows[i]];
-      reportRows.forEach((r, k) => r.sl = k + 1);
-      // clear sort active state since manual order now
-      document.getElementById('sortAsc').classList.remove('active');
-      document.getElementById('sortDesc').classList.remove('active');
-      renderTable();
-    }
+function deleteRow(id){reportRows=reportRows.filter(r=>r.id!==id);reportRows.forEach((r,i)=>r.sl=i+1);renderTable()}
+function clearReport(){if(!reportRows.length)return;if(!confirm('Clear all report entries?'))return;reportRows=[];renderTable()}
 
-    // parse chainage string like "3+450" → numeric 3450 for sorting
-    function chainageToNum(ch) {
-      const m = (ch || '').match(/(\d+)[+](\d+)/);
-      if (m) return parseInt(m[1]) * 1000 + parseInt(m[2]);
-      const n = parseFloat(ch);
-      return isNaN(n) ? 0 : n;
-    }
-
-    function sortReport(dir) {
-      if (!reportRows.length) { toast('No entries to sort', 'warn'); return }
-      reportRows.sort((a, b) => dir === 'asc' ? chainageToNum(a.chainage) - chainageToNum(b.chainage) : chainageToNum(b.chainage) - chainageToNum(a.chainage));
-      reportRows.forEach((r, i) => r.sl = i + 1);
-      document.getElementById('sortAsc').classList.toggle('active', dir === 'asc');
-      document.getElementById('sortDesc').classList.toggle('active', dir === 'desc');
-      renderTable();
-      toast(dir === 'asc' ? '↑ Sorted ascending' : '↓ Sorted descending');
-    }
-
-    function renderTable() {
-      const tbody = document.getElementById('reportBody');
-      const table = document.getElementById('reportTable');
-      const empty = document.getElementById('emptyState');
-      document.getElementById('reportCount').textContent = reportRows.length + ' entr' + (reportRows.length === 1 ? 'y' : 'ies');
-      if (!reportRows.length) { table.style.display = 'none'; empty.style.display = 'block'; return }
-      empty.style.display = 'none'; table.style.display = 'table';
-      tbody.innerHTML = reportRows.map((r, i) => `
-    <tr class="${i === reportRows.length - 1 ? 'new-row' : ''}">
+function renderTable(){
+  const tbody=document.getElementById('reportBody');
+  const table=document.getElementById('reportTable');
+  const empty=document.getElementById('emptyState');
+  document.getElementById('reportCount').textContent=reportRows.length+' entr'+(reportRows.length===1?'y':'ies');
+  if(!reportRows.length){table.style.display='none';empty.style.display='block';return}
+  empty.style.display='none';table.style.display='table';
+  tbody.innerHTML=reportRows.map((r,i)=>`
+    <tr class="${i===reportRows.length-1?'new-row':''}">
       <td class="td-num col-sl">${r.sl}</td>
       <td class="td-chainage col-chainage">${r.chainage}</td>
-      <td class="td-photo col-photo">${r.photo ? `<img src="${r.photo}" alt="photo"/>` : '<div class="no-photo">📷</div>'}</td>
+      <td class="td-photo col-photo">${r.photo?`<img src="${r.photo}" alt="photo"/>`:'<div class="no-photo">📷</div>'}</td>
       <td class="td-coords col-coords">${r.lat}<br>${r.lon}<br><span style="color:#3a4055">${r.dist}</span></td>
-      <td class="td-editable col-issue"><div contenteditable="true" data-placeholder="—" data-id="${r.id}" data-field="issue" oninput="syncEdit(this)">${r.issue || ''}</div></td>
-      <td class="td-editable col-solution"><div contenteditable="true" data-placeholder="—" data-id="${r.id}" data-field="solution" oninput="syncEdit(this)">${r.solution || ''}</div></td>
-      <td class="td-del">
-        <button class="btn-move" onclick="moveRow(${r.id},-1)" title="Move up" ${i === 0 ? 'style="opacity:.15;pointer-events:none"' : ''}>▲</button>
-        <button class="btn-move" onclick="moveRow(${r.id},1)" title="Move down" ${i === reportRows.length - 1 ? 'style="opacity:.15;pointer-events:none"' : ''}>▼</button>
-        <button class="btn-del-row" onclick="deleteRow(${r.id})" title="Remove row">✕</button>
-      </td>
+      <td class="td-editable col-issue"><div contenteditable="true" data-placeholder="—" data-id="${r.id}" data-field="issue" oninput="syncEdit(this)">${r.issue||''}</div></td>
+      <td class="td-editable col-solution"><div contenteditable="true" data-placeholder="—" data-id="${r.id}" data-field="solution" oninput="syncEdit(this)">${r.solution||''}</div></td>
+      <td class="td-del"><button onclick="deleteRow(${r.id})" title="Remove row">✕</button></td>
     </tr>`).join('');
-      reapplyColVisibility();
-    }
+  reapplyColVisibility();
+}
 
-    // ── Export DOC ────────────────────────────────────────────────────
-    function exportDoc() {
-      if (!reportRows.length) { toast('No entries to export', 'warn'); return }
-      const vis = getVisibleCols();
-      const date = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-      const headerCells = [vis.sl ? '<th style="width:30px;background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">#</th>' : '', vis.chainage ? '<th style="background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">Chainage</th>' : '', vis.photo ? '<th style="background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">Photo</th>' : '', vis.coords ? '<th style="background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">Coordinates</th>' : '', vis.issue ? '<th style="background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">Issue</th>' : '', vis.solution ? '<th style="background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt">Solution</th>' : ''].join('');
-      // Word ignores CSS px on <img> but honours explicit width/height HTML attributes
-      // Combined with mso-width-alt / mso-height-alt (in twips: 1 inch = 1440 twips)
-      // 2 inches = 2880 twips = 192px at 96dpi — set both attr & style for max compat
-      function mkPhotoCell(photo) {
-        if (!photo) return '<td style="padding:7px 9px;border:1px solid #ccc;text-align:center">-</td>';
-        return '<td style="padding:7px 9px;border:1px solid #ccc;text-align:center;width:160pt"><img src="' + photo + '" width="192" height="192" style="width:192px;height:192px;mso-width-alt:2880;mso-height-alt:2880;border:0" /></td>';
-      }
-      const rows = reportRows.map(r => `<tr>${[vis.sl ? `<td style="padding:7px 9px;border:1px solid #ccc;text-align:center;font-size:10pt">${r.sl}</td>` : '', vis.chainage ? `<td style="padding:7px 9px;border:1px solid #ccc;font-weight:bold;color:#007a4d;font-size:12pt">${r.chainage}</td>` : '', vis.photo ? mkPhotoCell(r.photo) : '', vis.coords ? `<td style="padding:7px 9px;border:1px solid #ccc;font-size:9pt;color:#555">${r.lat}<br>${r.lon}<br>${r.dist}</td>` : '', vis.issue ? `<td style="padding:7px 9px;border:1px solid #ccc;font-size:10pt">${r.issue || '-'}</td>` : '', vis.solution ? `<td style="padding:7px 9px;border:1px solid #ccc;font-size:10pt">${r.solution || '-'}</td>` : ''].join('')}</tr>`).join('');
-      const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+// ── Photo size for export (no canvas, no quality loss) ────────────
+const photoExp={mode:'ratio',w:200,h:200,ratioW:1,ratioH:1};
+
+function setPhotoMode(mode){
+  photoExp.mode=mode;
+  document.querySelectorAll('.photo-mode-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pmBtn-'+mode).classList.add('active');
+  renderPhotoSizeInputs();
+}
+
+function renderPhotoSizeInputs(){
+  const c=document.getElementById('photoSizeInputs');
+  const m=photoExp.mode;
+  if(m==='ratio'){
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">px</span>
+    <label style="margin-left:6px">Ratio</label>
+    <input type="number" value="${photoExp.ratioW}" min="1" max="20" style="width:44px" oninput="photoExpChange('rw',this.value)"/>
+    <span class="sep">:</span>
+    <input type="number" value="${photoExp.ratioH}" min="1" max="20" style="width:44px" oninput="photoExpChange('rh',this.value)"/>
+    <span style="color:var(--muted);margin-left:4px">→ H=${Math.round(photoExp.w*(photoExp.ratioH/photoExp.ratioW))}px</span>`;
+  }else if(m==='width'){
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">H = auto</span>`;
+  }else if(m==='height'){
+    c.innerHTML=`<label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" oninput="photoExpChange('h',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">W = auto</span>`;
+  }else{
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">×</span>
+    <label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" oninput="photoExpChange('h',this.value)"/> <span class="sep">px</span>`;
+  }
+}
+
+function photoExpChange(type,val){
+  const v=Math.max(40,parseInt(val)||40);
+  if(type==='w') photoExp.w=v;
+  else if(type==='h') photoExp.h=v;
+  else if(type==='rw'){photoExp.ratioW=Math.max(1,v);}
+  else if(type==='rh'){photoExp.ratioH=Math.max(1,v);}
+  renderPhotoSizeInputs();
+}
+
+// Returns width="" height="" attrs for the <img> in the exported DOC
+// Uses original image, no canvas, no quality loss — Word scales it visually
+function getExportImgTag(src){
+  const m=photoExp.mode;
+  if(m==='ratio'){
+    const w=photoExp.w, h=Math.round(w*(photoExp.ratioH/photoExp.ratioW));
+    return `<img src="${src}" width="${w}" height="${h}" style="display:block;margin:0 auto;object-fit:contain"/>`;
+  }else if(m==='width'){
+    return `<img src="${src}" width="${photoExp.w}" style="display:block;margin:0 auto"/>`;
+  }else if(m==='height'){
+    return `<img src="${src}" height="${photoExp.h}" style="display:block;margin:0 auto"/>`;
+  }else{
+    return `<img src="${src}" width="${photoExp.w}" height="${photoExp.h}" style="display:block;margin:0 auto;object-fit:contain"/>`;
+  }
+}
+
+// init on load
+renderPhotoSizeInputs();
+
+// ── Export DOC ────────────────────────────────────────────────────
+async function exportDoc(){
+  if(!reportRows.length){toast('No entries to export','warn');return}
+  toast('Preparing export…');
+  const vis=getVisibleCols();
+  const date=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+
+  const th='background:#007a4d;color:#fff;padding:8px 10px;border:1px solid #005c39;font-size:9pt;text-align:center';
+  const headerCells=[
+    vis.sl ?`<th style="${th};width:30px">#</th>`:'',
+    vis.chainage?`<th style="${th}">Chainage</th>`:'',
+    vis.photo  ?`<th style="${th}">Photo</th>`:'',
+    vis.coords ?`<th style="${th}">Coordinates</th>`:'',
+    vis.issue  ?`<th style="${th}">Issue</th>`:'',
+    vis.solution?`<th style="${th}">Solution</th>`:'',
+  ].join('');
+
+  const td='padding:7px 9px;border:1px solid #ccc;text-align:center;vertical-align:middle';
+  const rows=reportRows.map(r=>`<tr>${[
+    vis.sl      ?`<td style="${td};font-size:10pt">${r.sl}</td>`:'',
+    vis.chainage?`<td style="${td};font-weight:bold;color:#007a4d;font-size:12pt">${r.chainage}</td>`:'',
+    vis.photo   ?`<td style="${td}">${r.photo ? getExportImgTag(r.photo) : '-'}</td>`:'',
+    vis.coords  ?`<td style="${td};font-size:9pt;color:#555">${r.lat}<br>${r.lon}<br>${r.dist}</td>`:'',
+    vis.issue   ?`<td style="${td};font-size:10pt;text-align:left">${r.issue||'-'}</td>`:'',
+    vis.solution?`<td style="${td};font-size:10pt;text-align:left">${r.solution||'-'}</td>`:'',
+  ].join('')}</tr>`).join('');
+
+  const html=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><meta charset='utf-8'><title>Chainage Report</title>
-<style>body{font-family:Arial,sans-serif;margin:0cm 0cm;color:#222}h1{color:#007a4d;font-size:18pt;margin-bottom:4px}.meta{color:#888;font-size:9pt;margin-bottom:18px}table{width:100%;border-collapse:collapse}</style>
+<style>
+@page{margin:1.5cm 1.5cm 1.5cm 1.5cm}body{font-family:Arial,sans-serif;margin:0;padding:0;color:#222}
+h1{color:#007a4d;font-size:18pt;margin:0 0 4px 0}
+.meta{color:#888;font-size:9pt;margin-bottom:18px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{word-wrap:break-word}
+img{max-width:100%}
+</style>
 </head><body>
 <h1>Chainage Site Report</h1>
 <p class="meta">Date: ${date} &nbsp;|&nbsp; Total entries: ${reportRows.length}</p>
 <table><thead><tr>${headerCells}</tr></thead>
 <tbody>${rows}</tbody></table>
 </body></html>`;
-      const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Chainage_Report_' + Date.now() + '.doc'; a.click();
-      toast('✓ DOC exported');
-    }
+  const blob=new Blob(['\ufeff'+html],{type:'application/msword'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Chainage_Report_'+Date.now()+'.doc';a.click();
+  toast('✓ DOC exported');
+}
 
-    // ── Export CSV ────────────────────────────────────────────────────
-    function exportCSV() {
-      if (!reportRows.length) { toast('No entries to export', 'warn'); return }
-      const hdr = 'Sl No,Chainage,Latitude,Longitude,Distance,Issue,Solution\n';
-      const body = reportRows.map(r => [r.sl, r.chainage, r.lat, r.lon, r.dist, `"${r.issue}"`, `"${r.solution}"`].join(',')).join('\n');
-      const blob = new Blob([hdr + body], { type: 'text/csv' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Chainage_Report_' + Date.now() + '.csv'; a.click();
-      toast('✓ CSV exported');
-    }
+// ── Export CSV ────────────────────────────────────────────────────
+function exportCSV(){
+  if(!reportRows.length){toast('No entries to export','warn');return}
+  const hdr='Sl No,Chainage,Latitude,Longitude,Distance,Issue,Solution\n';
+  const body=reportRows.map(r=>[r.sl,r.chainage,r.lat,r.lon,r.dist,`"${r.issue}"`,`"${r.solution}"`].join(',')).join('\n');
+  const blob=new Blob([hdr+body],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Chainage_Report_'+Date.now()+'.csv';a.click();
+  toast('✓ CSV exported');
+}
 
-    // ── Column visibility ─────────────────────────────────────────────
-    const colVisible = { sl: true, chainage: true, photo: true, coords: true, issue: true, solution: true };
-    function toggleCol(col, cb) {
-      colVisible[col] = cb.checked;
-      document.getElementById('tog-' + col).classList.toggle('checked', cb.checked);
-      reapplyColVisibility();
-    }
-    function reapplyColVisibility() {
-      Object.keys(colVisible).forEach(col => {
-        document.querySelectorAll('.col-' + col).forEach(el => { el.style.display = colVisible[col] ? '' : 'none' });
-      });
-    }
-    function getVisibleCols() { return { ...colVisible } }
+// ── Column visibility ─────────────────────────────────────────────
+const colVisible={sl:true,chainage:true,photo:true,coords:true,issue:true,solution:true};
+function toggleCol(col,cb){
+  colVisible[col]=cb.checked;
+  document.getElementById('tog-'+col).classList.toggle('checked',cb.checked);
+  reapplyColVisibility();
+}
+function reapplyColVisibility(){
+  Object.keys(colVisible).forEach(col=>{
+    document.querySelectorAll('.col-'+col).forEach(el=>{el.style.display=colVisible[col]?'':'none'});
+  });
+}
+function getVisibleCols(){return {...colVisible}}
 
-    // ── Inline edit sync ──────────────────────────────────────────────
-    function syncEdit(el) {
-      const id = parseInt(el.dataset.id), field = el.dataset.field;
-      const row = reportRows.find(r => r.id === id);
-      if (row) row[field] = el.innerText.trim();
-    }
+// ── Inline edit sync ──────────────────────────────────────────────
+function syncEdit(el){
+  const id=parseInt(el.dataset.id),field=el.dataset.field;
+  const row=reportRows.find(r=>r.id===id);
+  if(row)row[field]=el.innerText.trim();
+}
 
-    // ── Helpers ───────────────────────────────────────────────────────
-    function showMsg(id, msg, type) { document.getElementById(id).innerHTML = msg ? `<div class="alert alert-${type}">${msg}</div>` : '' }
-    let _tt;
-    function toast(msg, type) { const el = document.getElementById('toast'); el.textContent = msg; el.style.borderColor = type === 'warn' ? 'var(--warn)' : type === 'danger' ? 'var(--danger)' : 'var(--accent)'; el.style.color = type === 'warn' ? 'var(--warn)' : type === 'danger' ? 'var(--danger)' : 'var(--accent)'; el.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2500) }
-  </script>
+// ── Helpers ───────────────────────────────────────────────────────
+function showMsg(id,msg,type){document.getElementById(id).innerHTML=msg?`<div class="alert alert-${type}">${msg}</div>`:''}
+let _tt;
+function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.style.borderColor=type==='warn'?'var(--warn)':type==='danger'?'var(--danger)':'var(--accent)';el.style.color=type==='warn'?'var(--warn)':type==='danger'?'var(--danger)':'var(--accent)';el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2500)}
+</script>
 </body>
-
 </html>
