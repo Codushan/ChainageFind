@@ -178,10 +178,10 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
       <div class="card-label"><span class="step-num">2</span> Your Location</div>
       <div class="card-title">Upload photo or enter coordinates</div>
       <div id="imgDropzone" class="dropzone">
-        <input type="file" id="imgFile" accept="image/*"/>
+        <input type="file" id="imgFile" accept="image/*" multiple/>
         <span class="drop-icon">📷</span>
-        <div class="drop-text"><strong>Upload photo</strong> — reads GPS from EXIF</div>
-        <div class="drop-formats">JPEG / PNG with location enabled</div>
+        <div class="drop-text"><strong>Upload photo(s)</strong> — reads GPS from EXIF</div>
+        <div class="drop-formats">Select multiple · JPEG / PNG with location enabled</div>
       </div>
       <div id="imgLoaded" style="display:none;margin-top:8px;"></div>
       <div id="imgMsg"></div>
@@ -307,8 +307,42 @@ function resetKML(){chainagePoints=[];document.getElementById('kmlLoaded').style
 const imgDz=document.getElementById('imgDropzone');
 imgDz.addEventListener('dragover',e=>{e.preventDefault();imgDz.classList.add('drag-over')});
 imgDz.addEventListener('dragleave',()=>imgDz.classList.remove('drag-over'));
-imgDz.addEventListener('drop',e=>{e.preventDefault();imgDz.classList.remove('drag-over');handleImage(e.dataTransfer.files[0])});
-document.getElementById('imgFile').addEventListener('change',e=>{if(e.target.files[0])handleImage(e.target.files[0])});
+imgDz.addEventListener('drop',e=>{e.preventDefault();imgDz.classList.remove('drag-over');handleImages(e.dataTransfer.files)});
+document.getElementById('imgFile').addEventListener('change',e=>{if(e.target.files.length)handleImages(e.target.files)});
+
+async function handleImages(files){
+  if(!files||!files.length)return;
+  const arr=Array.from(files);
+  if(arr.length===1){
+    handleImage(arr[0]);
+  } else {
+    resetImage();
+    toast(`Processing ${arr.length} images...`);
+    let added=0;
+    for(const file of arr){
+      try{
+        const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file)});
+        const exif=await exifr.parse(file,{gps:true,pick:['latitude','longitude','GPSLatitude','GPSLongitude','GPSLatitudeRef','GPSLongitudeRef']}).catch(()=>null);
+        let lat=null,lon=null,chain='—',dst='—';
+        if(exif){
+          lat=exif.latitude;lon=exif.longitude;
+          if(lat==null&&exif.GPSLatitude){lat=dms(exif.GPSLatitude,exif.GPSLatitudeRef);lon=dms(exif.GPSLongitude,exif.GPSLongitudeRef)}
+          if(lat!=null&&!isNaN(lat)&&chainagePoints.length){
+            const scored=chainagePoints.map(p=>({...p,dist:haversine(lat,lon,p.lat,p.lon)})).sort((a,b)=>a.dist-b.dist);
+            chain=scored[0].chainage;dst=fmtDist(scored[0].dist);
+          }
+        }
+        reportRows.push({id:Date.now()+Math.random(),sl:reportRows.length+1,chainage:chain,dist:dst,lat:lat!=null?lat.toFixed(6):'—',lon:lon!=null?lon.toFixed(6):'—',photo:dataUrl,issue:'',solution:''});
+        added++;
+      }catch(e){}
+    }
+    if(added>0){
+      reportRows.forEach((r,i)=>r.sl=i+1);
+      renderTable();
+      toast(`✓ ${added} entr${added>1?'ies':'y'} added directly`);
+    }
+  }
+}
 
 async function handleImage(file){
   if(!file)return;
