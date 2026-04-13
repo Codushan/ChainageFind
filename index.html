@@ -455,12 +455,28 @@ function renderPhotoSizeInputs(){
   }
 }
 
-function photoExpChange(type,val){
-  const v=Math.max(40,parseInt(val)||40);
-  if(type==='w') photoExp.w=v;
-  else if(type==='h') photoExp.h=v;
-  else if(type==='rw'){photoExp.ratioW=Math.max(1,v);}
-  else if(type==='rh'){photoExp.ratioH=Math.max(1,v);}
+function photoExpChange(type, val){
+  // allow empty while typing
+  if(val === ''){
+    if(type === 'w') photoExp.w = '';
+    else if(type === 'h') photoExp.h = '';
+    else if(type === 'rw') photoExp.ratioW = '';
+    else if(type === 'rh') photoExp.ratioH = '';
+    return; // 🚀 don't re-render
+  }
+
+  let v = parseInt(val);
+
+  if(isNaN(v)) return;
+
+  // apply min constraint only when valid number
+  v = Math.max(40, v);
+
+  if(type==='w') photoExp.w = v;
+  else if(type==='h') photoExp.h = v;
+  else if(type==='rw') photoExp.ratioW = Math.max(1, v);
+  else if(type==='rh') photoExp.ratioH = Math.max(1, v);
+
   renderPhotoSizeInputs();
 }
 
