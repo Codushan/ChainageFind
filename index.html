@@ -439,44 +439,28 @@ function renderPhotoSizeInputs(){
   const c=document.getElementById('photoSizeInputs');
   const m=photoExp.mode;
   if(m==='ratio'){
-    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">px</span>
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" onchange="photoExpChange('w',this.value)"/> <span class="sep">px</span>
     <label style="margin-left:6px">Ratio</label>
-    <input type="number" value="${photoExp.ratioW}" min="1" max="20" style="width:44px" oninput="photoExpChange('rw',this.value)"/>
+    <input type="number" value="${photoExp.ratioW}" min="1" max="20" style="width:44px" onchange="photoExpChange('rw',this.value)"/>
     <span class="sep">:</span>
-    <input type="number" value="${photoExp.ratioH}" min="1" max="20" style="width:44px" oninput="photoExpChange('rh',this.value)"/>
+    <input type="number" value="${photoExp.ratioH}" min="1" max="20" style="width:44px" onchange="photoExpChange('rh',this.value)"/>
     <span style="color:var(--muted);margin-left:4px">→ H=${Math.round(photoExp.w*(photoExp.ratioH/photoExp.ratioW))}px</span>`;
   }else if(m==='width'){
-    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">H = auto</span>`;
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" onchange="photoExpChange('w',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">H = auto</span>`;
   }else if(m==='height'){
-    c.innerHTML=`<label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" oninput="photoExpChange('h',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">W = auto</span>`;
+    c.innerHTML=`<label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" onchange="photoExpChange('h',this.value)"/> <span class="sep">px</span><span style="color:var(--muted);margin-left:4px">W = auto</span>`;
   }else{
-    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" oninput="photoExpChange('w',this.value)"/> <span class="sep">×</span>
-    <label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" oninput="photoExpChange('h',this.value)"/> <span class="sep">px</span>`;
+    c.innerHTML=`<label>W</label><input type="number" value="${photoExp.w}" min="40" max="800" onchange="photoExpChange('w',this.value)"/> <span class="sep">×</span>
+    <label>H</label><input type="number" value="${photoExp.h}" min="40" max="800" onchange="photoExpChange('h',this.value)"/> <span class="sep">px</span>`;
   }
 }
 
-function photoExpChange(type, val){
-  // allow empty while typing
-  if(val === ''){
-    if(type === 'w') photoExp.w = '';
-    else if(type === 'h') photoExp.h = '';
-    else if(type === 'rw') photoExp.ratioW = '';
-    else if(type === 'rh') photoExp.ratioH = '';
-    return; // 🚀 don't re-render
-  }
-
-  let v = parseInt(val);
-
-  if(isNaN(v)) return;
-
-  // apply min constraint only when valid number
-  v = Math.max(40, v);
-
-  if(type==='w') photoExp.w = v;
-  else if(type==='h') photoExp.h = v;
-  else if(type==='rw') photoExp.ratioW = Math.max(1, v);
-  else if(type==='rh') photoExp.ratioH = Math.max(1, v);
-
+function photoExpChange(type,val){
+  const v=Math.max(40,parseInt(val)||40);
+  if(type==='w') photoExp.w=v;
+  else if(type==='h') photoExp.h=v;
+  else if(type==='rw'){photoExp.ratioW=Math.max(1,v);}
+  else if(type==='rh'){photoExp.ratioH=Math.max(1,v);}
   renderPhotoSizeInputs();
 }
 
